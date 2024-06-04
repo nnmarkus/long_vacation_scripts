@@ -2,7 +2,7 @@
 Add-Type -AssemblyName System.Drawing
 
 $rootDir="C:\scripts\long_vacation_scripts\"
-
+$username
 
 function Show-DateTimePickerForm {
     param (
@@ -68,18 +68,15 @@ function Check-AD-Username {
     # Check if the username is null or empty
     if ([string]::IsNullOrEmpty($username)) {
         Write-Host "Username cannot be blank. Please re-enter username"
-        $username = Read-Host "Enter user name"
-        Check-Username -username $username
-        return
+        exit;
     }
 
     try { 
         Get-ADUser -Identity $username -ErrorAction Stop
-        Write-Host "Valid user: $username" 
+        Write-Host "Valid user: $username"
     } catch {
         Write-Host "Invalid username. Please verify this is the logon id / username for the account"
-        $username = Read-Host "Enter user name"
-        Check-Username -username $username
+        exit;
     }
 }
 
@@ -94,11 +91,12 @@ if ($form1Result) {
     if ($form2Result) {
         Write-Output "End of long vacation: $form2Result"
 
-        # Get the username for the person going on the long vacation.
-        $user = Read-Host "Enter Active Directory username"
+
         # Validates username is valid. 
         try {
-            Check-AD-Username -user $user
+            # Get the username for the person going on the long vacation.
+            $username = Read-Host "Enter Active Directory username"
+            Check-AD-Username -user $username
 
             # Gets the RSM Case number for scheduled task name
             try {
@@ -107,48 +105,57 @@ if ($form1Result) {
 
                 # Gets confirmation on the information entered. 
                 Write-Output "************************************************************"
-                Write-Output "*     Please take a screenshot of this page before         *"
-                Write-Output "*    confirming and upload screenshot to DASH case.        *"
+                Write-Output "*     Please review for accuracy before proceeding         *"
                 Write-Output "*         To cancel, enter 'N' or press CTRL+C             *"
                 Write-Output "************************************************************"
-                $confirmation = Read-Host "You are about to schedule an account lockout for:`nAD User:`t`t$user`nStarting:`t`t$form1Result`nEnding:`t`t`t$form2Result.`nCase:`t`t`t$csNumber`n`nAre you sure you want to proceed (Y/N)?"
+                $confirmation = Read-Host "You are about to schedule an account lockout for:`nAD User:`t`t$username`nStarting:`t`t$form1Result`nEnding:`t`t`t$form2Result.`nCase:`t`t`t$csNumber`n`nAre you sure you want to proceed (Y/N)?"
                 
                 # If confirmation was yes, continue. 
                 if ($confirmation -eq 'Y' -or $confirmation -eq 'y') {
-                    Write-Output "Confirmation dialog confirmed, setting scheduled tasks to lockout and unlock target user."
+                    Write-Output "Confirmation dialog confirmed, setting account expiration and scheduled task to unexpire account."
                     
-                    # Create the scheduled task to disable user
+                    # Set account expiration
                     try {
-                        $taskFolderPath = "\LongVacation"
-                        $fullFilePath="$rootDir"+"longVacationStart.ps1"
-                        $action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument "-File $fullFilePath -user $user"
                         $triggerTime = Get-Date $form1Result -Format "yyyy-MM-dd HH:mm:ss"
-                        $trigger = New-ScheduledTaskTrigger -Once -At $triggerTime
-                        $taskName = "$user"+"_"+"$csNumber"+"_"+"START"
-                        Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "$taskName" -TaskPath $taskFolderPath -User "System" -RunLevel Highest
+#                        $taskFolderPath = "\LongVacation"
+#                        $fullFilePath="$rootDir"+"longVacationStart.ps1"
+#                        $action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument "-File $fullFilePath -user $username"
+#                        $trigger = New-ScheduledTaskTrigger -Once -At $triggerTime
+#                        $taskName = "$username"+"_"+"$csNumber"+"_"+"START"
+#                        Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "$taskName" -TaskPath $taskFolderPath -User "System" -RunLevel Highest
 
+                        $currentDateTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+                        $timeSpan = New-TimeSpan -Start $currentDateTime -End $triggerTime
+                        Set-ADAccountExpiration -Identity $username -TimeSpan $timeSpan
+
+                        Write-Host "Set account expiration"
 
                         # Create the sceduled task to re-enable the user
                         try {
                             $taskFolderPath = "\LongVacation"
                             $fullFilePath="$rootDir"+"longVacationEnd.ps1"
-                            $action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument "-File $fullFilePath -user $user"
+                            $action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument "-File $fullFilePath -user $username"
                             $triggerTime = Get-Date $form2Result -Format "yyyy-MM-dd HH:mm:ss"
                             $trigger = New-ScheduledTaskTrigger -Once -At $triggerTime
-                            $taskName = "$user"+"_"+"$csNumber"+"_"+"END"
+                            $taskName = "$username"+"_"+"$csNumber"+"_"+"END"
                             Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "$taskName" -TaskPath $taskFolderPath -User "System" -RunLevel Highest
 
 
                             
                             # Script finished
-                            Read-Host "Completed creating the two scheduled tasks. Press any key to exit."
+                            Write-Host "Finished setting account expiration and scheduled task."
+                            Write-Output "************************************************************"
+                            Write-Output "*     Please take a screenshot of this page exiting        *"
+                            Write-Output "*            Upload screenshot to DASH case                *"
+                            Write-Output "************************************************************"
+                            Read-Host "Press any key to exit......"
                             Exit;
 
 
 
                             
                         } catch { Write-Output "FAILURE - Failed to set scheduled task to re-enable user." }
-                    } catch { Write-Output "FAILURE - Failed to set scheduled task to disable user." }
+                    } catch { Write-Output "FAILURE - Failed to set account expiration." }
                 } else { Write-Output "FAILURE - Confirmation dialog Cancelled" }
             } catch { Write-Output "FAILURE - Failed to get case number." }
         } catch { Write-Output "FAILURE - Failed to get AD username." }

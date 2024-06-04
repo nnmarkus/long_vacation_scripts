@@ -12,6 +12,6 @@ param(
 Import-Module ActiveDirectory
 
 # Disable the user account
-Enable-ADAccount -Identity $user
+Clear-ADAccountExpiration -Identity $user
 
-Write-Output "User $user has been disabled."
+Write-Output "User $user has been unexpired."
