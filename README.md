@@ -6,7 +6,20 @@ Default location for these scripts is C:\scripts\long_vacation_scripts
 
 Creates the scheduled tasks in LongVacation folder within TaskScheduler
 See task_schedule_folder_location.png
-Please create this folder if it does not exist yet. 
+
+
+POTENTIAL TO DO LIST:
+1.  Add SMTP notifications for when the set script is ran and when the end/start scripts are ran. 
+    Maybe a new distro like "longvacationnotifications@"
+
+
+
+This script can be used to create scheduled tasks (preferably on a domain controller) to 
+disable and re-enable users when they are known to be away for a extended period of time. 
+!!! this runs with the following settings so it MUST be set on a domain controller. 
+1. "Run whether user is logged on or not"
+2. Run as SYSTEM
+3. Run with highest privileges
 
 References: 
 Adapted the Graphical Date popup (Show-DateTimePickerForm function) from following MS forum. 
